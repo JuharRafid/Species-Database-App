@@ -1,54 +1,143 @@
 pipeline {
     agent any
 
+    environment {
+        ROOT = 'C:\\Species-Database-App'
+        TEST_DIR = 'C:\\Species-Database-App\\TESTING\\species-db-automation(Editable)'
+
+        MVN = 'C:\\Users\\rafid\\Downloads\\apache-maven-3.10.0\\bin\\mvn.cmd'
+        NPM = 'C:\\Program Files\\nodejs\\npm.cmd'
+        DOCKER = 'C:\\Users\\rafid\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe'
+    }
+
     stages {
 
         stage('Build') {
             steps {
-                echo 'Building project...'
-                bat 'mvn -DskipTests compile'
+                echo 'Building React administration application...'
+
+                dir("${ROOT}") {
+                    bat 'git config --global --add safe.directory C:/Species-Database-App'
+                    bat 'git branch --show-current'
+                    bat 'git rev-parse --short HEAD'
+                    bat '"%NPM%" run build'
+
+                    bat '''
+                    if exist "%WORKSPACE%\\build-artifact" rmdir /S /Q "%WORKSPACE%\\build-artifact"
+                    xcopy /E /I /Y "ReactDash\\dist" "%WORKSPACE%\\build-artifact"
+                    '''
+                }
+
+                archiveArtifacts artifacts: 'build-artifact/**',
+                                 fingerprint: true
             }
         }
 
         stage('Test') {
             steps {
-                echo 'Running smoke test only...'
-                bat 'mvn -Dtest=PipelineSmokeTest test'
+                echo 'Running isolated automated JUnit smoke test...'
+
+                dir("${TEST_DIR}") {
+                    bat '"%MVN%" -Dtest=PipelineSmokeTest test'
+                }
+
+                junit allowEmptyResults: true,
+                      testResults: "${TEST_DIR}\\target\\surefire-reports\\*.xml"
             }
         }
 
         stage('Code Quality') {
             steps {
-                echo 'Running basic code quality check...'
-                bat 'mvn checkstyle:check || exit /b 0'
+                echo 'Running ESLint code-quality analysis...'
+
+                dir("${ROOT}") {
+                    script {
+                        def lintStatus = bat(
+                            returnStatus: true,
+                            script: '"%NPM%" run lint > "%WORKSPACE%\\lint-report.txt" 2>&1'
+                        )
+
+                        echo "ESLint exit code: ${lintStatus}"
+                        echo 'Lint report archived for review.'
+                    }
+                }
+
+                archiveArtifacts artifacts: 'lint-report.txt',
+                                 allowEmptyArchive: true
             }
         }
 
         stage('Security') {
             steps {
-                echo 'Running dependency security check...'
-                bat 'mvn dependency:tree'
+                echo 'Running npm dependency vulnerability analysis...'
+
+                dir("${ROOT}") {
+                    script {
+                        def auditStatus = bat(
+                            returnStatus: true,
+                            script: '"%NPM%" --prefix ReactDash audit --audit-level=high > "%WORKSPACE%\\npm-audit.txt" 2>&1'
+                        )
+
+                        echo "npm audit exit code: ${auditStatus}"
+                        echo 'Non-zero may indicate vulnerabilities; security report is archived.'
+                    }
+                }
+
+                archiveArtifacts artifacts: 'npm-audit.txt',
+                                 allowEmptyArchive: true
             }
         }
 
         stage('Deploy') {
             steps {
-                echo 'Simulated deployment stage'
-                bat 'echo Application deployed successfully'
+                echo 'Deploying build to Docker test environment...'
+
+                writeFile file: 'Dockerfile.jenkins', text: '''
+FROM nginx:alpine
+COPY build-artifact/ /usr/share/nginx/html/
+'''
+
+                bat '"%DOCKER%" build -t species-db-test:%BUILD_NUMBER% -f Dockerfile.jenkins .'
+
+                bat '''
+                "%DOCKER%" rm -f species-db-test >nul 2>&1
+                exit /b 0
+                '''
+
+                bat '"%DOCKER%" run -d --name species-db-test -p 8090:80 species-db-test:%BUILD_NUMBER%'
             }
         }
 
         stage('Release') {
             steps {
-                echo 'Creating release package...'
-                bat 'mvn -DskipTests package'
+                echo 'Creating tagged and versioned release...'
+
+                bat '"%DOCKER%" tag species-db-test:%BUILD_NUMBER% species-db-release:1.0.%BUILD_NUMBER%'
+
+                bat '''
+                if not exist "%WORKSPACE%\\release" mkdir "%WORKSPACE%\\release"
+                '''
+
+                bat '''
+                powershell -NoProfile -Command "Compress-Archive -Path '%WORKSPACE%\\build-artifact\\*' -DestinationPath '%WORKSPACE%\\release\\species-db-1.0.%BUILD_NUMBER%.zip' -Force"
+                '''
+
+                archiveArtifacts artifacts: 'release/*.zip',
+                                 fingerprint: true
             }
         }
 
         stage('Monitoring') {
             steps {
-                echo 'Monitoring stage'
-                bat 'echo Application health check passed'
+                echo 'Checking deployed application health and container metrics...'
+        
+                bat 'powershell -NoProfile -Command "Start-Sleep -Seconds 3"'
+        
+                bat 'curl.exe -f http://localhost:8090/'
+        
+                bat '"%DOCKER%" stats --no-stream species-db-test'
+        
+                bat '"%DOCKER%" logs --tail 10 species-db-test'
             }
         }
     }
@@ -59,7 +148,11 @@ pipeline {
         }
 
         failure {
-            echo 'PIPELINE FAILED'
+            echo 'PIPELINE FAILED - REVIEW FAILED STAGE'
+        }
+
+        always {
+            echo "Jenkins Build Number: ${BUILD_NUMBER}"
         }
     }
 }
