@@ -41,7 +41,7 @@ public class LanguageSelectionPage {
 
     public void verifySelectedLanguageText(String expectedLanguage) {
     WebElement selectedLang = wait.until(
-            ExpectedConditions.visibilityOfElementLocated(selectedLanguageValue)
+            ExpectedConditions.visibilityOfElementLocated(selectedLanguageText)
     );
 
     Assert.assertEquals(

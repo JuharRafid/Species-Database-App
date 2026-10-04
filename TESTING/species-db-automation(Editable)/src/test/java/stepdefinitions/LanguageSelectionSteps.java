@@ -33,20 +33,7 @@ public class LanguageSelectionSteps {
         // currently only English AU exists
         wait.until(ExpectedConditions.elementToBeClickable(englishAU)).click();
     }
-    public void tapContinue() {
-
-    System.out.println("CURRENT URL = " + driver.getCurrentUrl());
-    System.out.println("PAGE TITLE = " + driver.getTitle());
-
-    wait.until(ExpectedConditions.presenceOfElementLocated(
-            By.tagName("body")
-    ));
-
-    wait.until(ExpectedConditions.elementToBeClickable(continueBtn));
-    driver.findElement(continueBtn).click();
-    System.out.println("Button present count = " +
-        driver.findElements(By.id("continueBtn")).size());
-    }
+    
 
 
     public void tapContinue() {

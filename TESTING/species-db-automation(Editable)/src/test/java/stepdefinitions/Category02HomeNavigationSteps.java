@@ -214,10 +214,7 @@ public class Category02HomeNavigationSteps {
         // TODO: Validate no duplication
     }
 
-    @When("device orientation is rotated")
-    public void device_orientation_is_rotated() {
-        // TODO: Rotate device
-    }
+    
 
     @Then("Home screen layout should adjust correctly")
     public void home_screen_layout_should_adjust_correctly() {

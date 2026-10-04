@@ -276,10 +276,7 @@ public class Category01AppEntrySteps {
        C1_T15 / C1_T16
        ========================= */
 
-    @Given("internet connection is disabled")
-    public void internet_connection_is_disabled() {
-        // TODO: Disable internet connectivity
-    }
+    
 
     @When("user launches the app for the first time")
     public void user_launches_the_app_for_the_first_time() {
@@ -315,10 +312,7 @@ public class Category01AppEntrySteps {
        C1_T17 / C1_T18 / C1_T19 / C1_T20
        ========================= */
 
-    @When("user presses device back button")
-    public void user_presses_device_back_button() {
-        // TODO: Simulate back button press
-    }
+   
 
     @Then("previous onboarding screen should be displayed")
     public void previous_onboarding_screen_should_be_displayed() {
